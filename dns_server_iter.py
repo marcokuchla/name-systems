@@ -14,8 +14,8 @@ class NameServer:
     '''
     Descreve um domínio, que pode conter subdomínios
     '''
-    _name: str = ''
-    _subdomains: List['NameServer'] = []
+    _name = ''
+    _subdomains = []
 
     def __init__(self, name: str, subdomains: List['NameServer'] = []):
         self._name = name
