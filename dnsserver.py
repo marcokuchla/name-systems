@@ -20,7 +20,7 @@ TYPE_LOOKUP = {
 }
 
 
-class Record:
+class Record(object):
     def __init__(self, rdata_type, *args, rtype=None, rname=None, ttl=None, **kwargs):
         if isinstance(rdata_type, RD):
             # actually an instance, not a type

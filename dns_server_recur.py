@@ -6,23 +6,18 @@
 
     Implementação do lookup recursivo
 '''
-
 from typing import List
-
 
 class NameServer:
     '''
     Descreve um domínio, que pode conter subdomínios
     '''
-    _name = ''
-    _subdomains = []
-
-    def __init__(self, name: str, subdomains: List['NameServer'] = []):
-        self._name = name
+    def __init__(self, name: str, subdomains: List['NameServer'] = None):
+        self.name = name
+        if subdomains is None:
+            subdomains = []
         self._subdomains = subdomains
 
-    def get_name(self) -> str:
-        return self._name
 
     def add_sub_domain(self, subdomain: 'NameServer'):
         '''Adiciona um novo subdomínio a este domínio'''
@@ -30,15 +25,17 @@ class NameServer:
 
     def name_lookup(self, lookupname: str, level: int = 1) -> bool:
         '''
-        retorna True se o nome for encontrado dentro de algum subdominio, False se não
+        Procura o lookupname dentro de seus subdominios e se encontrar
+        retorna True.
 
-        Em uma implementação real, poderia retornar a identidade da Entidade, ou chamar um callback
+        Em uma implementação real, poderia retornar a identidade da Entidade,
+        ou chamar um callback.
         '''
-        if lookupname == self._name:
+        if lookupname == self.name:
             return True
 
         splitname = lookupname.split('.')
-        if splitname[-1] == self._name:
+        if splitname[-1] == self.name:
             for domain in self._subdomains:
                 print('  ' * level + 'Domínio: ' + domain.get_name())
                 print('  ' * level + 'Nome a buscar: ' +
@@ -51,20 +48,23 @@ class NameServer:
         print('  ' * level + 'Não encontrado.')
         return False
 
+def main():
+    # Cada Objeto representa uma instância de um servidor
+    DIN = NameServer('din')
+    DAA = NameServer('daa')
+    UEM = NameServer('uem', [DAA, DIN])
+    UOL = NameServer('uol')
+    BRASIL = NameServer('br', [UOL, UEM])
 
-# Cada Objeto representa uma instância de um servidor
-DIN = NameServer('din')
-DAA = NameServer('daa')
-UEM = NameServer('uem', [DAA, DIN])
-UOL = NameServer('uol')
-BRASIL = NameServer('br', [UOL, UEM])
+    URL = 'din.uem.br'
 
-URL = 'din.uem.br'
+    print('=' * 20)
+    print('Name Server Recursivo')
+    print('=' * 20)
+    print()
+    print('Servidor Raíz: ' + BRASIL.name)
+    print('Nome a buscar: ' + URL)
+    BRASIL.name_lookup(URL)
 
-print('=' * 20)
-print('Name Server Recursivo')
-print('=' * 20)
-print()
-print('Servidor Raíz: ' + BRASIL.get_name())
-print('Nome a buscar: ' + URL)
-BRASIL.name_lookup(URL)
+if __name__ == '__main__':
+    main()

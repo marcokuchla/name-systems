@@ -14,15 +14,11 @@ class NameServer:
     '''
     Descreve um domínio, que pode conter subdomínios
     '''
-    _name = ''
-    _subdomains = []
-
-    def __init__(self, name: str, subdomains: List['NameServer'] = []):
-        self._name = name
+    def __init__(self, name: str, subdomains: List['NameServer'] = None):
+        self.name = name
+        if subdomains is None:
+            subdomains = []
         self._subdomains = subdomains
-
-    def get_name(self) -> str:
-        return self._name
 
     def add_sub_domain(self, subdomain: 'NameServer'):
         '''Adiciona um novo subdomínio a este domínio'''
@@ -31,7 +27,8 @@ class NameServer:
     def name_lookup(self, lookupname: str) -> (str, List['NameServer'], bool):
         '''
         nome da forma a.b.c.d._name retorna como a.b.c.d
-        nome da forma a.b.c.d.e retorna como nulo, ie. o nome não é valido para este domínio
+        nome da forma a.b.c.d.e retorna como nulo, ie. o nome não é valido
+        para este domínio
 
         Se o retorno for válido, também retorna os subdomínios para o próximo lookup
 
@@ -39,7 +36,7 @@ class NameServer:
             isto é, se o lookup foi consumido corretamente
         '''
         splitname = lookupname.split('.')
-        if splitname[-1] == self._name:
+        if splitname[-1] == self.name:
             return '.'.join(splitname[:-1]), self._subdomains, True
 
         return '', [], False
@@ -56,7 +53,7 @@ BRASIL = NameServer('br', [UEM, UOL])
 def lookup_names(url: str, root: NameServer, level: int = 0) -> bool:
     print('  ' * level + '-' * 20)
     print('  ' * level + 'Nome atual: ' + url)
-    print('  ' * level + 'Domínio: ' + root.get_name())
+    print('  ' * level + 'Domínio: ' + root.name)
 
     new_url, subdomains, found = root.name_lookup(url)
     print('  ' * level + ('Encontrado. Novo Nome: ' + new_url
