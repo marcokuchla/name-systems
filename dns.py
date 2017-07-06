@@ -6,18 +6,21 @@
     Implementação do lookup iterativo
 """
 import json
+import logging
+import re
 import socket
 import threading
-from typing import List
 
 class NameServer(threading.Thread):
     """
     Descreve um domínio, que pode conter subdomínios
     """
-    def __init__(self, name: str, host: str, port: int):
+    def __init__(self, name: str, level: int, host: str, port: int):
         super(NameServer, self).__init__()
         self.name = name
+        self.daemon = True
         self.address = '{}:{}'.format(host, port)
+        self._level = level
         self._host = host
         self._port = port
         self._lut = {} # lookup table para os registros DNS
@@ -27,18 +30,27 @@ class NameServer(threading.Thread):
         self._lut[domain] = address
 
     def name_lookup(self, lookupname: str) -> (bool, str, str):
-        """
-        #TODO: DOCUMENTAR
+        """Faz o lookup do nome requerido.
+
+        Dado o lookupname verifica se o endereço do nome requerido está
+        na tabela de lookup. Se o endereço não for encontrado, verifica
+        qual servidor de nome responde pelo domínio requerido e encaminha
+        o endereço do mesmo. Se não encontrar um servidor de nomes que
+        responda pelo domínio, retorna que o nome não foi encontrado.
+        A estrutura de retorno é uma tripla, sendo o primeiro campo uma
+        flag para indicar se encontrou algum registro que responda pelo
+        endereço, o segundo é nome do domínio e o terceiro é o endereço.
         """
         try:
             address = self._lut[lookupname]
             return (True, lookupname, address)
         except KeyError:
             pass
-        splitted = lookupname.rsplit('.', 1)
+        splitted = lookupname.split('.')
+        domain = '.'.join(splitted[-self._level:])
         try:
-            address = self._lut[splitted[-1]]
-            return (True, splitted[-1], address)
+            address = self._lut[domain]
+            return (True, domain, address)
         except KeyError:
             return (False, None, None)
 
@@ -58,10 +70,10 @@ class NameServer(threading.Thread):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind((self._host, self._port))
         sock.listen(4)
-        print("Listening on '{}'".format(self.address))
+        logging.info("Listening on '%s'", self.address)
         while True:
             (conn, addrinfo) = sock.accept()
-            print('Connected by', addrinfo)
+            logging.info("Connected by '%s'", addrinfo)
             threading.Thread(target=self.handler, args=(conn,)).start()
 
 class ResolverIter(object):
@@ -80,7 +92,7 @@ class ResolverIter(object):
                 conn.sendall(lookupname.encode('utf-8'))
                 response = conn.recv(1024)
                 response = response.decode('utf-8')
-            print(response)
+            logging.info('Response: %s', response)
             response_content = json.loads(response)
             return response_content
         try:
@@ -101,17 +113,24 @@ class ResolverIter(object):
         return response_content['addr']
 
 def main():
-    rootNS = NameServer('Root', '127.0.0.1', 10000)
-    brNS = NameServer('.br', '127.0.0.1', 10001)
-    uemNS = NameServer('uem.br', '127.0.0.1', 10002)
+    logging.basicConfig(
+        format='[%(levelname)s]%(threadName)s %(message)s',
+        level=logging.INFO)
+    rootNS = NameServer('Root', 1, '127.0.0.1', 10000)
+    brNS = NameServer('.br', 2, '127.0.0.1', 10001)
+    uemNS = NameServer('uem.br', 3, '127.0.0.1', 10002)
     rootNS.add_record('br', brNS.address)
-    brNS.add_record('uem', uemNS.address)
-    uemNS.add_record('din', '127.0.0.1:10003')
+    brNS.add_record('uem.br', uemNS.address)
+    uemNS.add_record('www.uem.br', '127.0.0.1:10003')
+    uemNS.add_record('din.uem.br', '127.0.0.1:10004')
     rootNS.start()
     brNS.start()
     uemNS.start()
     resolver = ResolverIter()
-    print(resolver.name_lookup('din.uem.br'))
+    lookingfor = 'din.uem.br'
+    logging.info("Resolvendo '%s'", lookingfor)
+    address = resolver.name_lookup(lookingfor)
+    logging.info("Endereço encontrado '%s'", address)
 
 if __name__ == '__main__':
     main()
