@@ -101,7 +101,7 @@ class ResolverIter(object):
         logging.info("Resolvendo '%s'", lookupname)
         try:
             address = self._cache[lookupname]
-            logging.info("Endereço encontrado '%s'", address)
+            logging.info("Endereço encontrado em cache '%s'", address)
             return address
         except KeyError:
             pass
