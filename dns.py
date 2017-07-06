@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# coding=utf-8
 """
     Implementação de um sistema de nomeação similar ao DNS
     Cada objeto NameServer representaria um servidor real
@@ -7,11 +8,10 @@
 """
 import json
 import logging
-import re
 import socket
 import threading
 
-class NameServer(threading.Thread):
+class NameServer(object):
     """
     Descreve um domínio, que pode conter subdomínios
     """
@@ -67,14 +67,17 @@ class NameServer(threading.Thread):
         conn.sendall(response.encode('utf-8'))
 
     def run(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind((self._host, self._port))
-        sock.listen(4)
-        logging.info("Listening on '%s'", self.address)
-        while True:
-            (conn, addrinfo) = sock.accept()
-            logging.info("Connected by '%s'", addrinfo)
-            threading.Thread(target=self.handler, args=(conn,)).start()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((self._host, self._port))
+            sock.listen(4)
+            logging.info("Listening on '%s'", self.address)
+            try:
+                while True:
+                    (conn, addrinfo) = sock.accept()
+                    logging.info("Connected by '%s'", addrinfo)
+                    threading.Thread(target=self.handler, args=(conn,)).start()
+            except KeyboardInterrupt:
+                pass
 
 class ResolverIter(object):
     """docstring for ResolverIter."""
@@ -95,42 +98,24 @@ class ResolverIter(object):
             logging.info('Response: %s', response)
             response_content = json.loads(response)
             return response_content
+        logging.info("Resolvendo '%s'", lookupname)
         try:
             address = self._cache[lookupname]
+            logging.info("Endereço encontrado '%s'", address)
             return address
         except KeyError:
             pass
         rootaddr = self._cache['.']
         response_content = dolookup(rootaddr)
         if not response_content['found']:
-            return 'Not found!'
+            logging.info("Endereço não encontrado!")
+            return 'Não encontrado!'
         while response_content['nsname'] != lookupname:
             response_content = dolookup(response_content['addr'])
             if not response_content['found']:
-                return 'Not found!'
+                logging.info("Endereço não encontrado!")
+                return 'Não encontrado!'
+        logging.info("Endereço encontrado '%s'", response_content['addr'])
         # caching
         self._cache[response_content['nsname']] = response_content['addr']
         return response_content['addr']
-
-def main():
-    logging.basicConfig(
-        format='[%(levelname)s]%(threadName)s %(message)s',
-        level=logging.INFO)
-    rootNS = NameServer('Root', 1, '127.0.0.1', 10000)
-    brNS = NameServer('.br', 2, '127.0.0.1', 10001)
-    uemNS = NameServer('uem.br', 3, '127.0.0.1', 10002)
-    rootNS.add_record('br', brNS.address)
-    brNS.add_record('uem.br', uemNS.address)
-    uemNS.add_record('www.uem.br', '127.0.0.1:10003')
-    uemNS.add_record('din.uem.br', '127.0.0.1:10004')
-    rootNS.start()
-    brNS.start()
-    uemNS.start()
-    resolver = ResolverIter()
-    lookingfor = 'din.uem.br'
-    logging.info("Resolvendo '%s'", lookingfor)
-    address = resolver.name_lookup(lookingfor)
-    logging.info("Endereço encontrado '%s'", address)
-
-if __name__ == '__main__':
-    main()
