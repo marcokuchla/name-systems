@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+"""Implementação de um servidor de DNS via dnslib
+Autor: Samuel Colvin, https://github.com/samuelcolvin
+Fonte: https://gist.github.com/samuelcolvin/ca8b429504c96ee738d62a798172b046"""
 from datetime import datetime
 from time import sleep
 
@@ -116,7 +119,7 @@ servers = [
 ]
 
 if __name__ == '__main__':
-    print('Starting DNS servers... ')
+    print('Starting DNS TCP/UDP servers... ')
     for s in servers:
         s.start_thread()
 

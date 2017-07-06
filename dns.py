@@ -55,6 +55,11 @@ class NameServer(object):
             return (False, None, None)
 
     def handler(self, conn):
+        """ Executa uma Thread de resolução de nomes.
+
+        Quando uma requisição de resolver um nome é feita, uma nova Thread é criada e 
+        esta irá buscar pela resolução do nome requisitado.
+        """
         lookupname = conn.recv(1024)
         lookupname = lookupname.decode('utf-8')
         found, nsname, addr = self.name_lookup(lookupname)
@@ -67,6 +72,10 @@ class NameServer(object):
         conn.sendall(response.encode('utf-8'))
 
     def run(self):
+        """ Executa o servidor
+
+        Função principal do servidor, mantém o servidor ativo até que uma interrupção de teclado ocorra
+        """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind((self._host, self._port))
             sock.listen(4)
@@ -80,7 +89,7 @@ class NameServer(object):
                 pass
 
 class ResolverIter(object):
-    """docstring for ResolverIter."""
+    """Classe que representa um processo de resolução de nomes pelo método iterativo"""
     def __init__(self):
         super(ResolverIter, self).__init__()
         self._cache = {
@@ -88,7 +97,12 @@ class ResolverIter(object):
         }
 
     def name_lookup(self, lookupname: str) -> str:
+        """ Resolve um nome e retorna um objeto JSON com sua resolução """
+
         def dolookup(address):
+            """ Solicita uma resolução com o servidor no endereço address no formato ip:porta
+            
+            Retorna o valor respondido pela conexão """
             (host, port) = address.split(':')
             port = int(port)
             with socket.create_connection((host, port)) as conn:
@@ -98,6 +112,7 @@ class ResolverIter(object):
             logging.info('Response: %s', response)
             response_content = json.loads(response)
             return response_content
+
         logging.info("Resolvendo '%s'", lookupname)
         try:
             address = self._cache[lookupname]
