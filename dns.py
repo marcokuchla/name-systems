@@ -2,9 +2,9 @@
 # coding=utf-8
 """
     Implementação de um sistema de nomeação similar ao DNS
-    Cada objeto NameServer representaria um servidor real
+    Cada objeto NameServer representaria um servidor de nomes real.
 
-    Implementação do lookup iterativo
+    Implementação do lookup iterativo.
 """
 import json
 import logging
@@ -13,7 +13,15 @@ import threading
 
 class NameServer(object):
     """
-    Descreve um domínio, que pode conter subdomínios
+    Descreve um domínio, que pode conter subdomínios.
+
+    Argumentos:
+    name -- Nome do servidor.
+    level -- Valor que representa o nível hierárquico desse servidor.
+        A raiz tem level 1, os filhos do servidor raiz tem level 2, os filhos
+        dos filhos level 3, e assim por diante.
+    host -- Endereço IP do servidor.
+    port -- Porta do servidor.
     """
     def __init__(self, name: str, level: int, host: str, port: int):
         super(NameServer, self).__init__()
@@ -26,7 +34,11 @@ class NameServer(object):
         self._lut = {} # lookup table para os registros DNS
 
     def add_record(self, domain: str, address: str):
-        """Adiciona um novo subdomínio a este domínio"""
+        """Adiciona um novo registro de subdomínio a este domínio.
+
+        Os registros são compostos de um nome de domínio, que é a chave
+        para a lookup table (lut) e um endereço no formato 'IP:PORT'.
+        """
         self._lut[domain] = address
 
     def name_lookup(self, lookupname: str) -> (bool, str, str):
@@ -34,12 +46,13 @@ class NameServer(object):
 
         Dado o lookupname verifica se o endereço do nome requerido está
         na tabela de lookup. Se o endereço não for encontrado, verifica
-        qual servidor de nome responde pelo domínio requerido e encaminha
-        o endereço do mesmo. Se não encontrar um servidor de nomes que
-        responda pelo domínio, retorna que o nome não foi encontrado.
-        A estrutura de retorno é uma tripla, sendo o primeiro campo uma
-        flag para indicar se encontrou algum registro que responda pelo
-        endereço, o segundo é nome do domínio e o terceiro é o endereço.
+        qual servidor de nome pode responder o endereço requerido e
+        encaminha o endereço do mesmo. Se não encontrar um servidor de
+        nomes que responda pelo domínio, retorna que o nome não foi
+        encontrado. A estrutura de retorno é uma tripla, sendo o primeiro
+        campo uma flag para indicar se encontrou algum registro que
+        responde pelo endereço, o segundo é nome do domínio e o terceiro
+        é o endereço correspondente ao domínio.
         """
         try:
             address = self._lut[lookupname]
@@ -55,10 +68,11 @@ class NameServer(object):
             return (False, None, None)
 
     def handler(self, conn):
-        """ Executa uma Thread de resolução de nomes.
+        """Trata uma requisição do cliente.
 
-        Quando uma requisição de resolver um nome é feita, uma nova Thread é criada e 
-        esta irá buscar pela resolução do nome requisitado.
+        Quando um resolvedor conecta no servidor, uma nova Thread é
+        criada para gerenciar a conexão estabelecida, e tratar a
+        as requisições de resolução de nomes.
         """
         lookupname = conn.recv(1024)
         lookupname = lookupname.decode('utf-8')
@@ -72,13 +86,14 @@ class NameServer(object):
         conn.sendall(response.encode('utf-8'))
 
     def run(self):
-        """ Executa o servidor
+        """Executa o servidor
 
-        Função principal do servidor, mantém o servidor ativo até que uma interrupção de teclado ocorra
+        Função principal do servidor, mantém o servidor ativo aguardando
+        conexões ou para quando ocorre uma interrupção de teclado.
         """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind((self._host, self._port))
-            sock.listen(4)
+            sock.listen(4) # aceita até 4 conexões simultâneas
             logging.info("Listening on '%s'", self.address)
             try:
                 while True:
@@ -89,7 +104,7 @@ class NameServer(object):
                 pass
 
 class ResolverIter(object):
-    """Classe que representa um processo de resolução de nomes pelo método iterativo"""
+    """Resolvedor de nomes pelo método iterativo."""
     def __init__(self):
         super(ResolverIter, self).__init__()
         self._cache = {
@@ -97,12 +112,13 @@ class ResolverIter(object):
         }
 
     def name_lookup(self, lookupname: str) -> str:
-        """ Resolve um nome e retorna um objeto JSON com sua resolução """
+        """Resolve um nome e retorna um objeto JSON com sua resolução."""
 
         def dolookup(address):
-            """ Solicita uma resolução com o servidor no endereço address no formato ip:porta
-            
-            Retorna o valor respondido pela conexão """
+            """Solicita uma resolução com o servidor de nomes no endereço
+            address no formato ip:porta.
+
+            Retorna o valor respondido pela conexão."""
             (host, port) = address.split(':')
             port = int(port)
             with socket.create_connection((host, port)) as conn:
@@ -115,22 +131,28 @@ class ResolverIter(object):
 
         logging.info("Resolvendo '%s'", lookupname)
         try:
+            # Procura primeiramente na cache e se encontrar retorna.
             address = self._cache[lookupname]
             logging.info("Endereço encontrado em cache '%s'", address)
             return address
         except KeyError:
             pass
+        # inicia a resolução pelo servidor de nomes raiz
         rootaddr = self._cache['.']
         response_content = dolookup(rootaddr)
         if not response_content['found']:
+            # Nome não encontrado retorna erro!
             logging.info("Endereço não encontrado!")
             return 'Não encontrado!'
+        # verifica se endereço encontrado é o requerido
         while response_content['nsname'] != lookupname:
+            # se não for procura iterativamente pela árvore de servidores.
             response_content = dolookup(response_content['addr'])
             if not response_content['found']:
                 logging.info("Endereço não encontrado!")
                 return 'Não encontrado!'
         logging.info("Endereço encontrado '%s'", response_content['addr'])
-        # caching
+        # Atualiza endereço na cache
         self._cache[response_content['nsname']] = response_content['addr']
+        # Retorna  o endereço encontrado
         return response_content['addr']
